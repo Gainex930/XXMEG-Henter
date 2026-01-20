@@ -10,7 +10,7 @@ import akshare as ak
 from collections import Counter
 
 # ================= 1. 系统配置 =================
-st.set_page_config(page_title="哨兵 V9.7", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="哨兵 V9.8", layout="wide", page_icon="☁️")
 
 # --- 文件存储路径 ---
 HISTORY_FILE = "sentinel_history_db.csv"   
@@ -35,22 +35,30 @@ def save_config(filename, text):
         return True
     except: return False
 
-# --- 状态初始化 ---
+# --- 🔥 核心修复：状态初始化 (防崩溃) ---
+# 定义必须存在的列名，防止云端空启动报错
+REQUIRED_COLS = ['Link', 'RawTime', 'Code', 'Source', 'Content', 'Time', 'Tags', 'Prio', 'Cat', 'Sent']
+
 if 'news_stream' not in st.session_state: 
     if os.path.exists(HISTORY_FILE):
         try: 
-            st.session_state.news_stream = pd.read_csv(HISTORY_FILE)
-            for col in ['Link', 'RawTime', 'Code', 'Source', 'Content', 'Time', 'Tags', 'Prio', 'Cat', 'Sent']: 
-                if col not in st.session_state.news_stream.columns:
-                    st.session_state.news_stream[col] = ""
-        except: st.session_state.news_stream = pd.DataFrame()
-    else: st.session_state.news_stream = pd.DataFrame()
+            df = pd.read_csv(HISTORY_FILE)
+            # 补全可能缺失的列
+            for col in REQUIRED_COLS:
+                if col not in df.columns: df[col] = ""
+            st.session_state.news_stream = df
+        except: 
+            # 读取失败，创建带表头的空表
+            st.session_state.news_stream = pd.DataFrame(columns=REQUIRED_COLS)
+    else: 
+        # 🔥 文件不存在（云端首次运行），创建带表头的空表
+        st.session_state.news_stream = pd.DataFrame(columns=REQUIRED_COLS)
 
 if 'market_trend' not in st.session_state: st.session_state.market_trend = "初始化..." 
 if 'last_update' not in st.session_state: st.session_state.last_update = "未刷新"
 if 'last_save_time' not in st.session_state: st.session_state.last_save_time = time.time()
 if 'scan_log' not in st.session_state: st.session_state.scan_log = []
-if 'show_dashboard' not in st.session_state: st.session_state.show_dashboard = False # 默认关闭仪表盘
+if 'show_dashboard' not in st.session_state: st.session_state.show_dashboard = False 
 
 if 'portfolio_text' not in st.session_state: 
     st.session_state.portfolio_text = load_config(CONFIG_FILE_PORTFOLIO, "中际旭创, 300059, 江波龙")
@@ -99,7 +107,6 @@ KNOWLEDGE_BASE = {
 
 NOISE_WORDS = ["收盘", "开盘", "指数", "报价", "汇率", "定盘", "结算", "涨跌", "日程", "前值", "融资"]
 
-# 🔥 移除启动时的缓存预加载，改为按需加载
 @st.cache_data(ttl=3600*12) 
 def get_cached_stock_map():
     try:
@@ -111,15 +118,10 @@ def get_cached_stock_map():
 
 def resolve_portfolio(portfolio_str):
     raw_list = [x.strip() for x in portfolio_str.replace("，", ",").split(",") if x.strip()]
-    # 🔥 优化：如果只是简单的刷新，不要去加载全市场字典，只做简单处理
-    # 只有在需要持仓高亮时，才调用 heavy function
     resolved = []
-    
-    # 尝试加载缓存，如果没有则跳过（避免启动卡顿）
-    # 在 V9.7 中，我们只在“深度模式”下强制加载字典
-    # 简单处理：
+    # 极速处理，不依赖庞大的字典加载
     for item in raw_list:
-        resolved.append((item, item)) # 暂时 code=name
+        resolved.append((item, item)) 
     return resolved
 
 def is_noise(content):
@@ -143,7 +145,6 @@ def check_relevance(content, resolved_portfolio):
     if sentiment == "POS": tags.append(f"🟢 利好: {','.join(sent_words[:2])}")
     if sentiment == "NEG": tags.append(f"🔴 利空: {','.join(sent_words[:2])}")
     
-    # 持仓匹配逻辑优化：字符串直接匹配，不依赖全字典
     for code, name in resolved_portfolio:
         if name in content:
             tags.insert(0, f"🎯 持仓: {name}")
@@ -174,7 +175,7 @@ def highlight_text(text):
         text = text.replace(act, f'<span style="font-weight:900; color:#2d3748; background-color:#edf2f7; padding:0 2px;">{act}</span>')
     return text
 
-# ================= 4. 数据处理 (V9.7: 极致纯净 + 手动大盘) =================
+# ================= 4. 数据处理 (V9.8: 极速分流 + 智能休眠) =================
 
 def log_scan(title, status):
     current_time = datetime.now().strftime("%H:%M:%S")
@@ -185,24 +186,20 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
     resolved_portfolio = resolve_portfolio(portfolio_str)
     fetched_list = []
     
-    # 极速模式：严禁访问个股接口
-    loop_count = 1; cls_limit = 20; progress_bar = None
-    time_limit = datetime.now() - timedelta(hours=2)
-    
-    # 深度模式：只有点按钮才开启
     if force_fetch:
         loop_count = 50; cls_limit = 1500
-        progress_bar = st.progress(0, text="🌊 正在进行深海拖网...")
+        progress_bar = st.progress(0, text="🌊 正在初始化 (加载全市场名单)...")
+        get_cached_stock_map() 
         time_limit = None
+    else:
+        loop_count = 1; cls_limit = 20; progress_bar = None
+        time_limit = datetime.now() - timedelta(hours=2)
 
-    # 1. 持仓狙击 (❌ 默认关闭，仅深度模式开启)
+    # 1. 持仓狙击 (🔥 严格限制：只有 force_fetch 为 True 时才执行)
     if force_fetch: 
-        # ... (深度扫描逻辑保持不变，但只有force_fetch才运行) ...
-        pass # 为了代码精简，此处省略深度扫描逻辑，因为V9.6已包含，这里只强调不跑
-        # 实际代码中，为了功能完整，我还是加上，但加上严格锁
         total_stocks = len(resolved_portfolio)
         for idx, (code, name) in enumerate(resolved_portfolio):
-            if not code or len(code) != 6: continue 
+            if not code: continue 
             if progress_bar: progress_bar.progress(int((idx / (total_stocks + 1)) * 30), text=f"🎯 正在狙击持仓: {name}...")
             try:
                 df_stock_news = ak.stock_news_em(symbol=code)
@@ -218,7 +215,7 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
                     })
             except: pass
     
-    # 2. 金十 (秒级)
+    # 2. 金十
     max_id = ""
     for i in range(loop_count):
         if force_fetch and progress_bar: progress_bar.progress(30 + int(i), text="🌍 扫描金十数据...")
@@ -245,6 +242,7 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
                     if len(full) < 5: continue
                     if not show_all and is_noise(full) and not force_fetch: continue
                     tags, prio, cat, sent = check_relevance(full, resolved_portfolio)
+                    if i == 0 and prio > 0 and not force_fetch: log_scan(full, "✅")
                     if show_all or prio > 0 or force_fetch:
                         fetched_list.append({
                             "Time": time_str, "Content": full, "Link": link, "Source": "🌍 金十",
@@ -254,7 +252,7 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
             else: break
         except: break
 
-    # 3. 财联社 (秒级)
+    # 3. 财联社
     try:
         df_cls = ak.stock_telegraph_cls(symbol="A股24小时电报")
         df_cls = df_cls.head(cls_limit)
@@ -268,6 +266,7 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
             full = f"【{title}】 {content}" if title != "无" else content
             if not show_all and is_noise(full) and not force_fetch: continue
             tags, prio, cat, sent = check_relevance(full, resolved_portfolio)
+            if not force_fetch and prio > 0: log_scan(full, "✅")
             if show_all or prio > 0 or force_fetch:
                 fetched_list.append({
                     "Time": time_str, "Content": full, "Link": "https://www.cls.cn/telegraph", "Source": "🇨🇳 财联社",
@@ -275,7 +274,7 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
                 })
     except: pass
     
-    # 4. 东财全球 (秒级)
+    # 4. 东财全球
     try:
         df_em = ak.stock_info_global_em()
         limit = 100 if force_fetch else 30
@@ -306,7 +305,7 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
     return pd.DataFrame(fetched_list)
 
 def fetch_research_data():
-    return fetch_latest_data("", force_fetch=True) # 复用逻辑
+    return fetch_latest_data("", force_fetch=True)
 
 def save_and_merge_data(new_df):
     if new_df.empty: return 0
@@ -314,7 +313,7 @@ def save_and_merge_data(new_df):
         try: disk_df = pd.read_csv(HISTORY_FILE)
         except: disk_df = pd.DataFrame()
     else: disk_df = pd.DataFrame()
-    for col in ['Link', 'RawTime']:
+    for col in REQUIRED_COLS:
         if col not in disk_df.columns: disk_df[col] = ""
     mem_df = st.session_state.news_stream
     combined = pd.concat([new_df, mem_df, disk_df], ignore_index=True)
@@ -324,7 +323,7 @@ def save_and_merge_data(new_df):
     st.session_state.news_stream = combined.head(5000)
     return len(combined)
 
-@st.cache_data(ttl=60) # 还是需要缓存，但这次是手动触发
+@st.cache_data(ttl=60)
 def get_realtime_sentiment():
     try:
         df = ak.stock_zh_a_spot_em()
@@ -344,14 +343,12 @@ def get_realtime_sentiment():
         return {"status": "fail", "msg": str(e)}
 
 def render_sentiment_dashboard():
-    # 🔥 只有当用户点了按钮，或者 session 里状态为 True 时才渲染
     if not st.session_state.show_dashboard:
         if st.button("🌡️ 点击加载实时大盘情绪 (耗时约2秒)", type="primary", use_container_width=True):
             st.session_state.show_dashboard = True
             st.rerun()
         return
 
-    # 加载数据
     with st.spinner("正在连接交易所行情..."):
         data = get_realtime_sentiment()
     
@@ -380,7 +377,7 @@ def extract_smart_summary(subset_df):
     holdings = subset_df[subset_df['Cat'] == 'holding']
     if not holdings.empty:
         for _, row in holdings.head(3).iterrows():
-            clean_txt = row['Content'].strip()
+            clean_txt = str(row['Content']).strip()
             if clean_txt[:20] in seen_content: continue
             seen_content.add(clean_txt[:20])
             summary_lines.append(f"⚠️ **持仓**: {clean_txt[:100]}...")
@@ -388,7 +385,7 @@ def extract_smart_summary(subset_df):
     if not main_news.empty:
         top_news = main_news.sort_values(by=['Prio', 'RawTime'], ascending=False).head(3)
         for _, row in top_news.iterrows():
-            clean_txt = row['Content'].strip()
+            clean_txt = str(row['Content']).strip()
             if clean_txt[:20] in seen_content: continue
             seen_content.add(clean_txt[:20])
             cat_cn = {"tech":"科技", "mfg":"制造", "macro":"宏观"}.get(row['Cat'], "热点")
@@ -442,7 +439,7 @@ def generate_report_data(df, days, topics_str):
             count_valid = 0
             for i, (_, row) in enumerate(top_rows.iterrows()):
                 if count_valid >= 5: break
-                clean_txt = row['Content'].replace("【", "").replace("】", "：").strip()
+                clean_txt = str(row['Content']).replace("【", "").replace("】", "：").strip()
                 if clean_txt[:20] in seen_content: continue
                 seen_content.add(clean_txt[:20])
                 desc_list.append(f"{count_valid+1}. {clean_txt}")
@@ -496,14 +493,14 @@ def create_report_html(data, report_type, days, topics):
             <div class="content">{item['Desc']}</div>
             <div style="margin-top:15px; font-size:13px; color:#666; border-top:1px dashed #ccc; padding-top:10px;">🔗 <b>产业链关联：</b>{item['Sector']}</div>
         </div>"""
-    html += """<div class="footer">由 情报哨兵 V9.7 系统自动生成</div></div></body></html>"""
+    html += """<div class="footer">由 情报哨兵 V9.8 系统自动生成</div></div></body></html>"""
     return html
 
 # ================= 6. 页面布局 =================
 
 with st.sidebar:
-    st.header("⚡ 哨兵 V9.7")
-    st.caption("极速纯净版")
+    st.header("☁️ 哨兵 V9.8")
+    st.caption("云端/本地通用版")
     
     with st.expander("💼 持仓配置"):
         portfolio_input = st.text_area("持仓", value=st.session_state.portfolio_text)
@@ -514,24 +511,22 @@ with st.sidebar:
     
     c1, c2 = st.columns(2)
     
-    # 极速刷新：无个股扫描
     if c1.button("🔄 极速刷新"):
-        with st.spinner("🚀 正在同步总线情报..."):
-            new_data = fetch_latest_data(portfolio_input, force_fetch=False) # 快速模式
+        with st.spinner("🚀 极速同步总线..."):
+            new_data = fetch_latest_data(portfolio_input, force_fetch=False) # 极速模式
             save_and_merge_data(new_data)
         st.toast("✅ 刷新完成 (秒级)", icon="⚡")
         time.sleep(0.3); st.rerun()
         
-    # 深度扫描：含个股
     if c2.button("⚡ 深度补全"):
-        with st.spinner("🐢 正在地毯式排查 50+ 持仓个股公告..."):
+        with st.spinner("🐢 深度扫描持仓公告..."):
             new_data = fetch_latest_data(portfolio_input, force_fetch=True) # 深度模式
             save_and_merge_data(new_data)
         st.success("✅ 全量补全完成")
         time.sleep(1); st.rerun()
 
     if st.button("📥 立即落盘 (存盘)"):
-        save_and_merge_data(pd.DataFrame()) # 强制触发保存
+        save_and_merge_data(pd.DataFrame()) 
         st.session_state.last_save_time = time.time()
         st.success(f"已将 {len(st.session_state.news_stream)} 条数据写入硬盘")
 
@@ -546,7 +541,7 @@ with st.sidebar:
 main_container = st.container()
 
 with main_container:
-    render_sentiment_dashboard() # 现在默认不显示，只有点击按钮才加载
+    render_sentiment_dashboard()
     
     st.info(f"📊 **情报库** | 历史库存: {len(st.session_state.news_stream)} 条 | 您的持仓: {st.session_state.portfolio_text[:20]}...")
 
@@ -566,7 +561,6 @@ with main_container:
             hl_content = highlight_text(str(row['Content']).replace("点击查看", ""))
             link = str(row.get('Link', ''))
             
-            # 🔥 修复：确保 cursor_style 和 title 始终被定义
             if link.startswith('http') and "baidu" not in link:
                 final_html = f'<a href="{link}" target="_blank" style="text-decoration:none; color:inherit; display:block;">{hl_content}</a>'
                 cursor_style = "pointer"
@@ -630,16 +624,12 @@ with main_container:
         df_research = st.session_state.news_stream[st.session_state.news_stream['Content'].str.contains('|'.join(RESEARCH_KEYWORDS), na=False)]
         
         my_stocks = [x.strip() for x in st.session_state.portfolio_text.replace("，", ",").split(",") if x.strip()]
-        stock_map = get_cached_stock_map()
-        my_stock_names = []
-        for s in my_stocks:
-            if re.match(r'\d{6}', s): my_stock_names.append(stock_map['c2n'].get(s, s))
-            else: my_stock_names.append(s)
+        
+        # 🔥 云端适配优化：不依赖 stock_map 缓存，直接用字符串匹配
+        pattern_my = '|'.join(my_stocks) if my_stocks else "ImpossibleStringXY"
             
         if not df_research.empty:
-            pattern_my = '|'.join(my_stock_names) if my_stock_names else "ImpossibleStringXY"
             df_my = df_research[df_research['Content'].str.contains(pattern_my, na=False)]
-            
             HIGH_VALUE_KEYWORDS = ["上调", "买入", "增持", "业绩预增", "中标", "签署", "获批", "证监会", "央行", "重磅", "突破", "立案", "调查"]
             df_high = df_research[df_research['Content'].str.contains('|'.join(HIGH_VALUE_KEYWORDS), na=False) & ~df_research.index.isin(df_my.index)]
             df_norm = df_research[~df_research.index.isin(df_my.index) & ~df_research.index.isin(df_high.index)]
