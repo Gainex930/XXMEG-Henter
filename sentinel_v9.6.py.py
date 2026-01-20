@@ -10,7 +10,7 @@ import akshare as ak
 from collections import Counter
 
 # ================= 1. 系统配置 =================
-st.set_page_config(page_title="哨兵 V10.1", layout="wide", page_icon="🛡️")
+st.set_page_config(page_title="哨兵 V10.2", layout="wide", page_icon="⚔️")
 
 # --- 文件存储路径 ---
 HISTORY_FILE = "sentinel_history_db.csv"   
@@ -59,17 +59,49 @@ if 'portfolio_text' not in st.session_state:
 if 'report_topics' not in st.session_state:
     st.session_state.report_topics = load_config(CONFIG_FILE_TOPICS, "政策, 算力硬件, 商业航天, AI, 机器人")
 
-# ================= 3. 核心逻辑：智能联想库 =================
-# (配置保持一致)
-FOREIGN_SOURCES = {"彭博": "Bloomberg", "路透": "Reuters", "华尔街日报": "WSJ", "推特": "Twitter/X", "美联储": "FED"}
-SENTIMENT_DICT = {"POS": ["增持", "回购", "预增", "增长", "盈利", "中标", "合同", "获批", "举牌"], "NEG": ["减持", "亏损", "下降", "立案", "调查", "警示", "跌停", "破发"]}
-SECTOR_MAP = {"tech": "电子/通信", "mfg": "制造/能源", "macro": "宏观", "stock_event": "个股", "other": "综合"}
-KNOWLEDGE_BASE = {
-    "英伟达": ("CPO/算力", "tech"), "华为": ("鸿蒙/海思", "tech"), "SpaceX": ("商业航天", "mfg"), "Tesla": ("机器人/车", "mfg"),
-    "GPU": ("算力", "tech"), "半导体": ("半导体", "tech"), "芯片": ("半导体", "tech"), "存储": ("存储", "tech"),
-    "证监会": ("政策", "macro"), "央行": ("政策", "macro"), "通胀": ("宏观", "macro"), "黄金": ("宏观", "macro")
+# ================= 3. 核心配置库 (完整补全，绝不删减) =================
+
+FOREIGN_SOURCES = {
+    "彭博": "Bloomberg", "路透": "Reuters", "华尔街日报": "WSJ", "推特": "Twitter/X", "美联储": "FED"
 }
-NOISE_WORDS = ["收盘", "开盘", "指数", "报价", "汇率", "定盘", "结算", "涨跌", "日程", "融资"]
+
+SENTIMENT_DICT = {
+    "POS": ["增持", "回购", "预增", "增长", "扭亏", "盈利", "分红", "中标", "合同", "签署", "获批", "突破", "上线", "发布", "举牌", "买入", "跑赢", "上调"],
+    "NEG": ["减持", "亏损", "下降", "预减", "立案", "调查", "警示", "问询", "处罚", "解禁", "跌停", "破发", "下修", "利空", "违约", "诉讼"]
+}
+
+SECTOR_MAP = {
+    "tech": "电子/通信/半导体", "mfg": "高端制造/能源", "macro": "宏观/金融", "stock_event": "个股异动", "other": "综合"
+}
+
+# --- 关键词库 ---
+BASE_POLICY = ["政策", "意见", "通知", "规划", "行动计划", "获批", "支持", "谣言", "监管", "立案", "发布", "印发", "证监会", "央行", "财政部", "发改委", "工信部", "国常会", "政治局", "降准", "降息", "专项债", "逆回购", "LPR", "房贷", "新质生产力", "数据要素", "以旧换新", "国企改革", "市值管理", "耐心资本", "研报", "解读", "分析", "点评", "策略", "展望", "预测", "研判", "券商", "证券", "评级", "增持评级", "目标价", "首席", "宏观团队", "纪要"]
+BASE_COMPUTING = ["算力", "GPU", "服务器", "数据中心", "英伟达", "H20", "B200", "超算", "液冷", "智算", "CPO", "光模块", "交换机", "光通信", "东数西算", "寒武纪", "海光", "昇腾", "鲲鹏"]
+BASE_HARDWARE = ["硬件", "手机", "PC", "消费电子", "面板", "显卡", "苹果", "华为", "Mate", "电子", "AI手机", "AI PC", "折叠屏", "穿戴设备", "VR", "MR", "智能家居"]
+BASE_CHIP = ["半导体", "芯片", "晶圆", "集成电路", "IC", "第三代", "IGBT", "MCU", "制造", "代工", "中芯", "台积电", "华虹", "封装", "测试", "封测", "长电", "通富", "华天", "先进封装", "CoWoS", "光刻机", "蚀刻", "薄膜", "清洗", "设备", "北方华创", "中微", "组件", "零部件", "材料", "光刻胶", "靶材"]
+BASE_STORAGE = ["存储", "HBM", "DRAM", "NAND", "闪存", "美光", "海力士", "长鑫", "江波龙", "佰维", "兆易"]
+BASE_AEROSPACE = ["商业航天", "航天", "火箭", "卫星", "太空", "发射", "深空", "星链", "SpaceX", "G60", "垣信", "千帆", "蓝箭", "星际荣耀", "低轨", "星座", "遥感", "通信卫星", "推进", "发动机", "液氧", "甲烷", "燃料", "整流罩", "零部件", "高温合金", "碳纤维", "3D打印"]
+BASE_AI = ["AI", "人工智能", "大模型", "GPT", "Sora", "生成式", "机器视觉", "Agent", "OpenAI", "豆包", "Kimi", "文心", "通义", "智谱", "月之暗面", "文生图", "文生视频", "多模态", "AIGC", "算法", "边缘计算"]
+BASE_ROBOT = ["机器人", "人形", "优必选", "拓普", "三花", "绿的", "具身智能", "灵巧手", "传感器", "IMU", "视觉", "减速器", "谐波", "RV", "丝杠", "滚柱", "行星", "空心杯", "电机", "伺服"]
+
+# 🔥 修复报错的关键：完整定义 TOPIC_EXPANSION
+TOPIC_EXPANSION = {
+    "政策": BASE_POLICY, "算力": BASE_COMPUTING, "硬件": BASE_HARDWARE, "半导体": BASE_CHIP, "芯片": BASE_CHIP, "存储": BASE_STORAGE, "存储芯片": BASE_STORAGE, "商业航天": BASE_AEROSPACE, "航天": BASE_AEROSPACE, "AI": BASE_AI, "机器人": BASE_ROBOT,
+    "算力硬件": BASE_COMPUTING + BASE_HARDWARE, "储存": BASE_STORAGE, "储存芯片": BASE_STORAGE, "半导体产业链": BASE_CHIP,
+    "低空": ["低空", "无人机", "eVTOL", "飞行汽车", "通航", "亿航", "万丰"],
+    "汽车": ["汽车", "新能源车", "智驾", "自动驾驶", "特斯拉", "问界", "小米汽车", "赛力斯", "比亚迪"]
+}
+
+KNOWLEDGE_BASE = {
+    "英伟达": ("CPO/算力", "tech"), "Nvidia": ("CPO/算力", "tech"), "AMD": ("芯片", "tech"), "光模块": ("CPO", "tech"), "OpenAI": ("AI应用", "tech"), "华为": ("鸿蒙/海思", "tech"), "SpaceX": ("商业航天", "mfg"), "核聚变": ("核电", "mfg"), "电力": ("电网", "mfg"), "Tesla": ("机器人/车", "mfg"), "低空": ("低空经济", "mfg"), "固态": ("固态电池", "mfg"), "脑机": ("脑机接口", "tech"), "互联网": ("工业互联网", "tech"), "平台": ("平台经济", "tech"),
+    "GPU": ("算力", "tech"), "服务器": ("算力", "tech"), "半导体": ("半导体", "tech"), "芯片": ("半导体", "tech"), "存储": ("存储芯片", "tech"), "HBM": ("存储芯片", "tech"), "光刻机": ("半导体", "tech"), "封测": ("半导体", "tech"), "晶圆": ("半导体", "tech"), "火箭": ("商业航天", "mfg"), "卫星": ("商业航天", "mfg"), "星链": ("商业航天", "mfg"), "人形": ("机器人", "mfg"), "具身智能": ("机器人", "mfg"),
+    "关税": ("宏观", "macro"), "制裁": ("宏观", "macro"), "汇率": ("宏观", "macro"), "证监会": ("政策", "macro"), "央行": ("政策", "macro"), "研报": ("研报", "macro"), "评级": ("研报", "macro"), "策略": ("研报", "macro"),
+    "通胀": ("宏观", "macro"), "CPI": ("宏观", "macro"), "PPI": ("宏观", "macro"), "GDP": ("宏观", "macro"),
+    "黄金": ("宏观", "macro"), "原油": ("宏观", "macro"), "天然气": ("宏观", "macro"), "期货": ("宏观", "macro"),
+    "指数": ("宏观", "macro"), "成交额": ("宏观", "macro"), "北向": ("宏观", "macro"), "两市": ("宏观", "macro")
+}
+
+NOISE_WORDS = ["收盘", "开盘", "指数", "报价", "汇率", "定盘", "结算", "涨跌", "日程", "前值", "融资"]
 
 @st.cache_data(ttl=3600*12) 
 def get_cached_stock_map():
@@ -128,9 +160,13 @@ def highlight_text(text):
     text = str(text)
     text = re.sub(r'([+-]?\d+\.?\d*%)', r'<span style="color:#d946ef; font-weight:bold;">\1</span>', text)
     text = re.sub(r'(\d{6})', r'<span style="background:#e0f2fe; color:#0369a1; padding:0 4px; border-radius:3px; font-family:monospace;">\1</span>', text)
+    text = re.sub(r'(\d+\.?\d*[亿万])', r'<span style="color:#d97706; font-weight:bold;">\1</span>', text)
+    actions = ["增持", "买入", "中标", "签署", "获批", "立案", "调查", "突破", "首发", "启动", "减持"]
+    for act in actions:
+        text = text.replace(act, f'<span style="font-weight:900; color:#2d3748; background-color:#edf2f7; padding:0 2px;">{act}</span>')
     return text
 
-# ================= 4. 数据抓取 =================
+# ================= 4. 数据抓取 (新闻) =================
 
 def log_scan(title, status):
     st.session_state.scan_log.insert(0, f"[{datetime.now().strftime('%H:%M:%S')}] {status}: {title[:10]}...")
@@ -143,41 +179,104 @@ def fetch_latest_data(portfolio_str, show_all=False, force_fetch=False):
     if force_fetch:
         loop_count = 50; cls_limit = 1500; time_limit = None
         progress_bar = st.progress(0, text="🌊 初始化...")
+        get_cached_stock_map() # 预热
     else:
         loop_count = 1; cls_limit = 20; progress_bar = None
         time_limit = datetime.now() - timedelta(hours=2)
 
+    # 1. 持仓 (仅深度模式)
     if force_fetch: 
+        total_stocks = len(resolved_portfolio)
         for idx, (code, name) in enumerate(resolved_portfolio):
             if not code: continue 
-            if progress_bar: progress_bar.progress(idx*2, text=f"🎯 {name}")
+            if progress_bar: progress_bar.progress(int((idx / (total_stocks + 1)) * 30), text=f"🎯 {name}")
             try:
                 df_news = ak.stock_news_em(symbol=code)
                 for _, row in df_news.head(3).iterrows(): 
                     title = row.get('title', ''); content = row.get('content', '') or title
                     time_str = row.get('public_time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    link = row.get('url', '') or row.get('Url', '') or row.get('link', '')
+                    if not link: link = f"http://guba.eastmoney.com/list,{code}.html"
                     full = f"【{name}公告】{title} {content}"
-                    fetched_list.append({"Time": time_str, "Content": full, "Link": "", "Source": "🇨🇳 公告", "Tags": str([f"🎯 {name}"]), "Prio": 2, "Cat": "holding", "Sent": "NEU", "RawTime": time_str, "Code": code})
+                    fetched_list.append({"Time": time_str, "Content": full, "Link": link, "Source": "🇨🇳 公告", "Tags": str([f"🎯 持仓: {name}"]), "Prio": 2, "Cat": "holding", "Sent": "NEU", "RawTime": time_str, "Code": code})
             except: pass
     
+    # 2. 金十
+    max_id = ""
+    for i in range(loop_count):
+        if force_fetch and progress_bar: progress_bar.progress(30 + int(i), text="🌍 扫描金十数据...")
+        try:
+            url = "https://flash-api.jin10.com/get_flash_list"; params = {"channel": "-8200", "vip": "1", "max_time": max_id}
+            headers = {"x-app-id": "bVBF4FyRTn5NJF5n", "x-version": "1.0.0"}
+            resp = requests.get(url, params=params, headers=headers, timeout=3)
+            if resp.status_code == 200:
+                data_list = resp.json().get("data", [])
+                if not data_list: break
+                if data_list: max_id = data_list[-1].get("id", "")
+                for item in data_list:
+                    data = item.get("data", {}); time_str = item.get("time", "")
+                    if time_limit:
+                        try:
+                            if datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S") < time_limit: continue
+                        except: pass
+                    content = data.get("content", "") or ""; title = data.get("title", "") or ""
+                    item_id = item.get("id")
+                    link = f"https://flash.jin10.com/detail/{item_id}" if item_id else "https://www.jin10.com"
+                    full = f"【{title}】 {content}" if title and title not in content else content
+                    if len(full) < 5: continue
+                    if not show_all and is_noise(full) and not force_fetch: continue
+                    tags, prio, cat, sent = check_relevance(full, resolved_portfolio)
+                    if i == 0 and prio > 0 and not force_fetch: log_scan(full, "✅")
+                    if show_all or prio > 0 or force_fetch:
+                        fetched_list.append({"Time": time_str, "Content": full, "Link": link, "Source": "🌍 金十", "Tags": str(tags), "Prio": prio, "Cat": cat, "Sent": sent, "RawTime": time_str, "Code": ""})
+                if force_fetch: time.sleep(0.05)
+            else: break
+        except: break
+
+    # 3. 财联社
     try:
-        url = "https://flash-api.jin10.com/get_flash_list"; params = {"channel": "-8200", "vip": "1"}
-        resp = requests.get(url, params=params, headers={"x-app-id": "bVBF4FyRTn5NJF5n"}, timeout=3)
-        if resp.status_code == 200:
-            for item in resp.json().get("data", []):
-                data = item.get("data", {}); time_str = item.get("time", "")
-                if time_limit and datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S") < time_limit: continue
-                content = data.get("content", "") or ""; title = data.get("title", "") or ""
-                full = f"【{title}】 {content}" if title and title not in content else content
-                if not show_all and is_noise(full) and not force_fetch: continue
-                tags, prio, cat, sent = check_relevance(full, resolved_portfolio)
-                if show_all or prio > 0 or force_fetch:
-                    fetched_list.append({"Time": time_str, "Content": full, "Link": "https://www.jin10.com", "Source": "🌍 金十", "Tags": str(tags), "Prio": prio, "Cat": cat, "Sent": sent, "RawTime": time_str, "Code": ""})
+        df_cls = ak.stock_telegraph_cls(symbol="A股24小时电报")
+        df_cls = df_cls.head(cls_limit)
+        for _, row in df_cls.iterrows():
+            time_str = str(row['publish_time'])
+            if time_limit:
+                try:
+                    if datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S") < time_limit: continue
+                except: pass
+            content = row['content'] or ""; title = row['title'] or ""
+            full = f"【{title}】 {content}" if title != "无" else content
+            if not show_all and is_noise(full) and not force_fetch: continue
+            tags, prio, cat, sent = check_relevance(full, resolved_portfolio)
+            if not force_fetch and prio > 0: log_scan(full, "✅")
+            if show_all or prio > 0 or force_fetch:
+                fetched_list.append({"Time": time_str, "Content": full, "Link": "https://www.cls.cn/telegraph", "Source": "🇨🇳 财联社", "Tags": str(tags), "Prio": prio, "Cat": cat, "Sent": sent, "RawTime": time_str, "Code": ""})
+    except: pass
+    
+    # 4. 东财全球
+    try:
+        df_em = ak.stock_info_global_em()
+        limit = 100 if force_fetch else 30
+        for _, row in df_em.head(limit).iterrows():
+            time_str = str(row['发布时间'])
+            if time_limit:
+                try:
+                    if datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S") < time_limit: continue
+                except: pass
+            content = row['content']; title = row['标题']
+            link = row['原文链接']
+            if not link: link = "https://kuaixun.eastmoney.com/"
+            full = f"【{title}】 {content}" if title else content
+            if not show_all and is_noise(full) and not force_fetch: continue
+            tags, prio, cat, sent = check_relevance(full, resolved_portfolio)
+            if show_all or prio > 0 or force_fetch:
+                fetched_list.append({"Time": time_str, "Content": full, "Link": link, "Source": "🚀 东财", "Tags": str(tags), "Prio": prio, "Cat": cat, "Sent": sent, "RawTime": time_str})
     except: pass
 
-    # 3. 财联社 & 4. 东财全球 (代码略，保持原样，功能保留)
-
-    if force_fetch and progress_bar: progress_bar.empty()
+    if force_fetch and progress_bar: 
+        progress_bar.progress(100, text="✅ 抓取完成")
+        time.sleep(0.5)
+        progress_bar.empty()
+        
     return pd.DataFrame(fetched_list)
 
 def fetch_research_data():
@@ -191,12 +290,13 @@ def save_and_merge_data(new_df):
     else: disk_df = pd.DataFrame()
     for col in REQUIRED_COLS:
         if col not in disk_df.columns: disk_df[col] = ""
-    combined = pd.concat([new_df, st.session_state.news_stream, disk_df], ignore_index=True).drop_duplicates(subset=['Content'], keep='first').sort_values(by='RawTime', ascending=False)
+    mem_df = st.session_state.news_stream
+    combined = pd.concat([new_df, mem_df, disk_df], ignore_index=True).drop_duplicates(subset=['Content'], keep='first').sort_values(by='RawTime', ascending=False)
     st.session_state.news_stream = combined.head(5000)
     st.session_state.news_stream.head(8000).to_csv(HISTORY_FILE, index=False, encoding='utf-8-sig')
     return len(combined)
 
-# ================= 5. 🔥 V10.1 核心：极速仪表盘 + 板块热力 =================
+# ================= 5. 🔥 极速仪表盘 (不卡顿版) =================
 
 @st.cache_data(ttl=30)
 def get_market_indices_fast():
@@ -217,10 +317,7 @@ def get_market_indices_fast():
 
 @st.cache_data(ttl=60)
 def get_sector_heatmap_fast():
-    """
-    🔥 V10.1 新增：极速板块热力
-    只拉取行业数据（几十条），不拉个股（几千条），云端秒开！
-    """
+    """🔥 极速板块热力：只拉行业，不拉个股"""
     try:
         df = ak.stock_board_industry_name_em()
         df = df.sort_values(by='涨跌幅', ascending=False)
@@ -231,13 +328,11 @@ def get_sector_heatmap_fast():
         return {"status": "fail", "msg": str(e)}
 
 def render_sentiment_dashboard():
-    # 1. 核心指数（极速）
     indices = get_market_indices_fast()
     if indices:
         cols = st.columns(4)
         total_amount = sum([i['amount'] for i in indices])
         up_idx_count = len([i for i in indices if i['pct'] > 0])
-        
         if up_idx_count == 3: mood = "🔥 全面普涨"; mood_color = "#c53030"
         elif up_idx_count == 0: mood = "💚 单边下行"; mood_color = "#2f855a"
         else: mood = "⚖️ 分化震荡"; mood_color = "#d69e2e"
@@ -253,34 +348,29 @@ def render_sentiment_dashboard():
     else:
         st.caption("⏳ 正在连接行情接口...")
 
-    # 2. 🔥 V10.1 优化：行业热力扫描 (替代卡死的深度扫描)
+    # 🔥 替换掉卡死的“涨跌家数扫描”，改成“板块扫描”
     with st.expander("🌡️ 行业风口 (点击展开)", expanded=False):
         c1, c2 = st.columns([1, 4])
         if c1.button("🚀 扫描热点行业"):
             with st.spinner("正在获取行业数据..."):
                 data = get_sector_heatmap_fast()
                 if data['status'] == 'success':
-                    # 渲染领涨
                     st.markdown("**🔥 领涨行业：**")
                     cols_up = st.columns(5)
                     for i, item in enumerate(data['top']):
                         with cols_up[i]:
                             st.markdown(f"<span style='color:#c53030; font-weight:bold'>{item['板块名称']}</span><br><span style='color:red'>{item['涨跌幅']}%</span>", unsafe_allow_html=True)
-                    
                     st.markdown("---")
-                    # 渲染领跌
                     st.markdown("**💚 领跌行业：**")
                     cols_down = st.columns(5)
                     for i, item in enumerate(sorted(data['bot'], key=lambda x: x['涨跌幅'])):
                         with cols_down[i]:
                             st.markdown(f"<span style='color:#2f855a; font-weight:bold'>{item['板块名称']}</span><br><span style='color:green'>{item['涨跌幅']}%</span>", unsafe_allow_html=True)
-                else:
-                    st.error("接口连接超时，请稍后重试")
+                else: st.error("接口连接超时")
 
-# ================= 6. 辅助功能 =================
-# (保持原有的研报生成和列表渲染逻辑)
+# ================= 6. 辅助功能 (研报/复盘) =================
+
 def extract_smart_summary(subset_df):
-    # ... (代码省略，保持 V10.0 逻辑) ...
     summary_lines = []
     seen_content = set()
     holdings = subset_df[subset_df['Cat'] == 'holding']
@@ -328,11 +418,16 @@ def generate_report_data(df, days, topics_str):
     df = df[df['dt'] >= cutoff_time]
     if df.empty: return None
     topics = [t.strip() for t in topics_str.replace("，", ",").split(",") if t.strip()]
+    NOISE_TITLES = ["午评", "收盘", "早盘", "三大指数", "数据整理", "要闻汇总", "日历", "投资避雷针", "早间新闻", "昨日", "复盘", "一览"]
     report_sections = []
+    
+    # 这里的 TOPIC_EXPANSION 现在已经是全局定义的了，不会再报错 NameError
     for topic in topics:
         keywords = TOPIC_EXPANSION.get(topic, [topic])
         pattern = "|".join(keywords)
         mask = df['Content'].str.contains(pattern, case=False, na=False) | df['Tags'].str.contains(pattern, case=False, na=False)
+        if topic not in ["政策", "全球宏观", "宏观"]:
+             mask = mask & ~df['Content'].str.contains('|'.join(NOISE_TITLES), case=False)
         subset = df[mask]
         if not subset.empty:
             count = len(subset); pos_count = len(subset[subset['Sent'] == 'POS'])
@@ -341,9 +436,15 @@ def generate_report_data(df, days, topics_str):
             elif count >= 2: strength = "🟡 中"; bg_color = "#fffff0"
             top_rows = subset.sort_values(by=['Prio', 'RawTime'], ascending=False).head(10)
             desc_list = []
+            seen_content = set()
+            count_valid = 0
             for i, (_, row) in enumerate(top_rows.iterrows()):
+                if count_valid >= 5: break
                 clean_txt = str(row['Content']).replace("【", "").replace("】", "：").strip()
-                desc_list.append(f"{i+1}. {clean_txt}")
+                if clean_txt[:20] in seen_content: continue
+                seen_content.add(clean_txt[:20])
+                desc_list.append(f"{count_valid+1}. {clean_txt}")
+                count_valid += 1
             full_desc = "<br><br>".join(desc_list)
             cat_code = subset.iloc[0]['Cat']
             related_sector = SECTOR_MAP.get(cat_code, "综合")
@@ -367,8 +468,8 @@ def create_report_html(data, report_type, days, topics):
 # ================= 7. 页面布局 =================
 
 with st.sidebar:
-    st.header("☁️ 哨兵 V10.1")
-    st.caption("防卡死·热力版")
+    st.header("☁️ 哨兵 V10.2")
+    st.caption("全功能·修复版")
     
     with st.expander("💼 持仓配置"):
         portfolio_input = st.text_area("持仓", value=st.session_state.portfolio_text)
@@ -404,7 +505,7 @@ with st.sidebar:
 main_container = st.container()
 
 with main_container:
-    render_sentiment_dashboard() # 🔥 调用新的热力仪表盘
+    render_sentiment_dashboard() # 调用极速仪表盘
     
     st.info(f"📊 **情报库** | 历史库存: {len(st.session_state.news_stream)} 条 | 您的持仓: {st.session_state.portfolio_text[:20]}...")
 
